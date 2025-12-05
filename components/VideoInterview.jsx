@@ -1,10 +1,6 @@
-// components/VideoInterview.jsx
 import { useEffect, useRef, useState } from "react";
 
-export default function VideoInterview({
-  currentQuestion,
-  onResponse,
-}) {
+export default function VideoInterview({ currentQuestion, onResponse }) {
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -12,14 +8,10 @@ export default function VideoInterview({
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Initialize webcam and mic
   useEffect(() => {
     async function init() {
       try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        });
+        const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setStream(s);
         if (videoRef.current) videoRef.current.srcObject = s;
       } catch (err) {
@@ -29,25 +21,17 @@ export default function VideoInterview({
     }
 
     init();
-
     return () => {
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
   const getMimeType = () => {
-    const types = [
-      "video/webm; codecs=vp9,opus",
-      "video/webm; codecs=vp8,opus",
-      "video/webm",
-    ];
-    for (const t of types) {
-      if (MediaRecorder.isTypeSupported(t)) return t;
-    }
+    const types = ["video/webm; codecs=vp9,opus", "video/webm; codecs=vp8,opus", "video/webm"];
+    for (const t of types) if (MediaRecorder.isTypeSupported(t)) return t;
     return "";
   };
 
-  // Start recording
   function startRecording() {
     if (!stream) return;
     setIsRecording(true);
@@ -64,7 +48,6 @@ export default function VideoInterview({
     recorder.start();
   }
 
-  // Stop recording and send video
   function stopRecording() {
     if (!mediaRecorderRef.current) return;
 
@@ -78,76 +61,64 @@ export default function VideoInterview({
   }
 
   async function uploadVideo(blob) {
-  setLoading(true);
-  try {
-    const form = new FormData();
-    form.append("video", blob, "recording.webm");
-
-    const res = await fetch("/api/video-interview", {
-      method: "POST",
-      body: form,
-    });
-
-    const raw = await res.text();
-    let data;
+    setLoading(true);
     try {
-      data = JSON.parse(raw);
-    } catch (err) {
-      console.error("Invalid server response:", raw);
-      alert("Server returned invalid response.");
+      const form = new FormData();
+      form.append("video", blob, "recording.webm");
+
+      const res = await fetch("/api/video-interview", {
+        method: "POST",
+        body: form,
+      });
+
+      const raw = await res.text();
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch (err) {
+        console.error("Invalid server response:", raw);
+        alert("Server returned invalid response.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("FRONTEND RECEIVED:", data);
       setLoading(false);
-      return;
-    }
 
-    console.log("FRONTEND RECEIVED:", data);
+      if (data.error) {
+        alert("Transcription failed.");
+        return;
+      }
 
-    if (data.error) {
-      alert("Transcription failed.");
+      // Pass transcription and AI response back to parent
+      onResponse({
+        transcription: data.transcription,
+        aiResponse: data.aiResponse
+      });
+    } catch (error) {
+      console.error("UPLOAD ERROR:", error);
+      alert("Upload failed");
       setLoading(false);
-      return;
     }
-
-    // --- NEW: call evaluate API ---
-    const evalRes = await fetch("/api/evaluate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answer: data.transcription }),
-    });
-    const evalData = await evalRes.json();
-
-    // merge evaluation with original response
-    onResponse({
-      ...data,
-      humanPercent: evalData.humanPercent,
-      aiPercent: evalData.aiPercent,
-      briefReason: evalData.briefReason,
-    });
-
-    setLoading(false);
-
-  } catch (error) {
-    console.error("UPLOAD ERROR:", error);
-    alert("Upload failed");
-    setLoading(false);
   }
-}
-
-
 
   return (
     <div style={{ padding: 20 }}>
       <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{
-          width: "100%",
-          maxHeight: 360,
-          borderRadius: 8,
-          background: "#000",
-        }}
-      />
+  ref={videoRef}
+  autoPlay
+  playsInline
+  muted
+  style={{
+    width: "80%",
+    maxWidth: "100%",
+    aspectRatio: "1/1", // makes it square
+    borderRadius: 8,
+    background: "#000",
+    objectFit: "cover",
+  }}
+/>
+
 
       <div style={{ marginTop: 12 }}>
         <strong>AI Interviewer:</strong>
